@@ -8,8 +8,8 @@
     <fragment xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:map="http://schemas.android.com/apk/res-auto"
         xmlns:tools="http://schemas.android.com/tools"
-        android:id="@+id/map1"
-        android:name="com.google.android.gms.maps.SupportMapFragment"
+        android:id="@+id/map"
+        android:name="com.google.android.gms.maps.MapFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         tools:context=".MapsActivity" />
@@ -20,14 +20,23 @@
         android:layout_width="50dp"
         android:layout_height="50dp"
         android:layout_alignParentRight="true"
-        android:layout_marginStart="10dp"
-        android:layout_marginEnd="10dp"
-        android:layout_marginRight="223dp"
+        android:layout_marginTop="70dp"
+        android:layout_marginRight="10dp"
         android:background="@drawable/button_style"
         android:text="+"
         android:textSize="30sp">
-
     </Button>
+
+    <TextView
+        android:id="@+id/location_tv"
+        android:visibility="invisible"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="30dp"
+        android:background="#FFF"
+        android:layout_alignParentBottom="true">
+    </TextView>
+
 
 </RelativeLayout>
 

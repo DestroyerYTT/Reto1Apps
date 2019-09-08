@@ -3,10 +3,12 @@ package com.example.reto1apps;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
-
 import android.Manifest;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
-import android.graphics.drawable.ShapeDrawable;
+import android.icu.text.Transliterator;
+import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -14,131 +16,185 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
-
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.maps.model.Polygon;
-import com.google.android.gms.maps.model.PolygonOptions;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.Task;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, LocationListener {
 
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+
+
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleMap.OnMapClickListener, LocationListener, GoogleMap.OnMarkerClickListener {
+
+    /**
+     * Google map
+     */
     private GoogleMap mMap;
+
+    /**
+     * Marker of the current location of the user
+     */
     private Marker myLocation;
-    private Polygon icesiArea;
+
+    /**
+     * List of Markers put on the map
+     */
+    private ArrayList<Marker> markersOnMap;
+
+    /**
+     * Dialog to show and write the name of the markers
+     */
+    private AlertDialog makerName;
+
+    /**
+     * Object to get the direction of the current position
+     */
+    private Geocoder coder;
+
+    /**
+     * Button to allow to put more markers
+     */
     private Button plusBtn;
+
+    /**
+     * Text view to show the nearest location to current location
+     */
+    private TextView locationTextView;
+
+    /**
+     * Boolean attribute to put more markers
+     */
     private boolean state;
+
+    /**
+     *  Variable to save the call back of permission
+     */
     private int CALL_BACK_ID = 1;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.activity_maps);
-        // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.map1);
+
+        // Obtain the SupportMapFragment and get notified when the map is ready to be used
+        MapFragment mapFragment = (MapFragment) getFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
+        //Inicial state
         state = false;
+
+        makerName = new AlertDialog.Builder(MapsActivity.this).create();
+
+        locationTextView = findViewById(R.id.location_tv);
+
         plusBtn = findViewById(R.id.plus_btn);
+
+        //Setting the listener to plusBtn
         plusBtn.setOnClickListener(new View.OnClickListener() {
+
+            /**
+             * Listener of the plusBtn when click on it
+             * @param view
+             */
             @Override
             public void onClick(View view) {
                 state = true;
-               // plusBtn.setBackgroundResource(R.drawable.button_style2);
+                Toast.makeText(getApplicationContext(), "-- Click on the map to a put a marker --", Toast.LENGTH_LONG).show();
+                plusBtn.setVisibility(View.GONE);
+
             }
         });
     }
 
 
     /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
+     * Method for manipulates the map once available
      */
     @Override
     public void onMapReady(GoogleMap googleMap) {
+
+        //Inicialiation of the Google Map
         mMap = googleMap;
-        icesiArea = mMap.addPolygon(new PolygonOptions().add(
-                new LatLng(3.343017, -76.530918),
-                new LatLng(3.343350, -76.527615),
-                new LatLng(3.338680, -76.527208),
-                new LatLng(3.338500, -76.531390)
-        ));
-        LatLng icesi = new LatLng(3.341441,-76.529544);
 
-        myLocation = mMap.addMarker(new MarkerOptions().position(icesi).title("Icesi"));
+        coder = new Geocoder(getApplicationContext());
 
-        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(icesi, 15));
+        // Setting the listener when there is a click on a marker
+        mMap.setOnMarkerClickListener(this);
 
+        //Inicialize a instace of array
+        if (markersOnMap == null) {
+            markersOnMap = new ArrayList<>();
+        }
+
+        //Inicial position
+        LatLng pos = new LatLng(3.341441,-76.529544);
+
+        // Inicialization of current location
+        myLocation = mMap.addMarker(new MarkerOptions().position(pos).title("Current Location"));
+
+        // Setting the icon to the current location
+        myLocation.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.position1));
+
+        // Animating the camera to focus on the current location
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, 15));
+
+        // Code to ask permission
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             mMap.setMyLocationEnabled(true);
         } else {
             if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
-                // Mostrar diálogo explicativo
             } else {
-                // Solicitar permiso
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, CALL_BACK_ID);
             }
 
         }
 
+        // System service to get the current location
         LocationManager manager = (LocationManager) getSystemService(LOCATION_SERVICE);
         manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, this);
 
-
-
-        mMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
-            @Override
-            public void onMapClick(LatLng latLng) {
-                if(state){
-                   MarkerOptions marker = new MarkerOptions().position(latLng);
-                    mMap.addMarker(marker);
-               //     getCurrentLocation();
-                    state = false;
-                }
-            }
-        });
-
+        //Setting the listener when there is a click on the map
+        mMap.setOnMapClickListener(this);
     }
 
-    private void getCurrentLocation(){
-        FusedLocationProviderClient fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
-        Task task = fusedLocationProviderClient.getLastLocation();
-        Location location = null;
-        task.addOnSuccessListener(new OnSuccessListener() {
-            @Override
-            public void onSuccess(Object o) {
-                Location loc = (Location)o;
-                LatLng location = new LatLng(loc.getLatitude(), loc.getLongitude());
-                myLocation.setPosition(location);
-                mMap.animateCamera(CameraUpdateFactory.newLatLng(location));
-                Toast.makeText(MapsActivity.this,loc.getLatitude()+" "+loc.getLongitude(),Toast.LENGTH_SHORT).show();
-                System.out.println( loc.getLatitude() + " - " + loc.getLongitude());
-            }
-        });
+    /**
+     *  Method to handle when there is a click on the map
+     * @param latLng
+     */
+    @Override
+    public void onMapClick(LatLng latLng) {
+        if(state){
+            MarkerOptions marker = new MarkerOptions().position(latLng);
+            Marker temp = mMap.addMarker(marker);
+            markersOnMap.add(temp);
+            state = false;
+            putTitle(temp);
+            plusBtn.setVisibility(View.VISIBLE);
+        }
     }
 
 
     @Override
     public void onLocationChanged(Location location) {
-    LatLng pos = new LatLng(location.getLatitude(), location.getLongitude());
-    myLocation.setPosition(pos);
-    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, 15));
+        LatLng pos = new LatLng(location.getLatitude(), location.getLongitude());
+        myLocation.setPosition(pos);
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, mMap.getCameraPosition().zoom));
+        updateNearestPlace();
     }
+
 
     @Override
     public void onStatusChanged(String s, int i, Bundle bundle) {
@@ -154,4 +210,93 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onProviderDisabled(String s) {
 
     }
-}
+
+    public void putTitle(final Marker marker){
+        final AlertDialog.Builder alert = new AlertDialog.Builder(this);
+        alert.setMessage("Please, give a name to the marker");
+        alert.setTitle("Maker inicialization");
+
+        final EditText inputTitle = new EditText(this);
+
+        alert.setView(inputTitle);
+
+        alert.setPositiveButton("Confirm", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                String message = inputTitle.getText().toString();
+                marker.setTitle(message);
+            }
+        });
+
+        alert.show();
+    }
+
+
+    /**
+     * Method from internet to calculate the distance
+     * @param startP Start position
+     * @param endP   End position
+     * @return The distance between the start position and the end position
+     */
+    public double calculationByDistance(LatLng startP, LatLng endP) {
+        double R = 6371000;
+        double deltaLat = endP.latitude - startP.latitude;
+        double deltaLong = endP.longitude - startP.longitude;
+        double deltaLatRad = Math.toRadians(deltaLat);
+        double deltaLongRad = Math.toRadians(deltaLong);
+        double a = Math.pow(deltaLatRad/2, 2) + Math.cos(startP.longitude) * Math.cos(endP.longitude)* Math.pow(deltaLongRad/2, 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        double distance = R * c;
+        return distance;
+    }
+
+    @Override
+    public boolean onMarkerClick(Marker marker) {
+        String location = "Current location";
+        double dist = calculationByDistance(marker.getPosition(), myLocation.getPosition());
+        DecimalFormat newFormat = new DecimalFormat("######.##");
+        String distance = newFormat.format(dist);
+        if(!distance.startsWith("0")){
+            marker.setSnippet("Distance to current position: " + distance +" meters");
+        }else{
+            try{
+                //Current position
+                location = coder.getFromLocation(myLocation.getPosition().latitude, myLocation.getPosition().longitude, 1).get(0).getAddressLine(0);
+            }catch (Exception e){
+                e.printStackTrace();
+            }
+            marker.setSnippet(location);
+        }
+        return false;
+    }
+
+    public void updateNearestPlace(){
+        String text = "The nearest marker to the current position is: ";
+        HashMap<Double, String> places = new HashMap<>();
+        double distances[] = new double[markersOnMap.size()];
+
+        int counter = 0;
+        for(Marker marker : markersOnMap){
+            double distance = calculationByDistance(marker.getPosition(), myLocation.getPosition());
+            distances[counter] = distance;
+            counter++;
+            places.put(new Double(distance), marker.getTitle());
+        }
+        Arrays.sort(distances);
+        if(counter > 0){
+            if(places.get(new Double(distances[0])) != null){
+
+                if(distances[0] < 10){
+                  text = "You are in: " +  places.get(new Double(distances[0]));
+                }else{
+                    text = text + places.get(new Double(distances[0]));
+                }
+            }
+        }
+        locationTextView.setText(text);
+        locationTextView.setVisibility(View.VISIBLE);
+    }
+
+
+    }
+
